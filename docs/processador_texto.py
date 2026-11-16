@@ -57,7 +57,7 @@ Apresenta a tua análise exatamente com esta estrutura:
 """
 
 
-def extrair_topicos_e_resumo(transcricao: str) -> str:
+def process_meeting_text(transcricao: str) -> str:
     prompt = f"{SYSTEM_INSTRUCTION}\n\n--- INÍCIO DA TRANSCRIÇÃO ---\n{transcricao}\n--- FIM DA TRANSCRIÇÃO ---"
 
     max_tentativas = 3
