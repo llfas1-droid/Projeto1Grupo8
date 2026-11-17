@@ -1,22 +1,13 @@
 import os
-import time
+import requests # Nova biblioteca que instalaste
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-from google.genai._gaos.lib.compat_errors import InternalServerError
 
 # 1. Carrega as variáveis de ambiente a partir do ficheiro .env
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    raise ValueError(
-        "A variável GEMINI_API_KEY não foi encontrada no ficheiro .env. "
-        "Adicione: GEMINI_API_KEY='a_sua_chave' ao seu .env."
-    )
-
-# 2. Inicializa o cliente oficial da Google GenAI
-client = genai.Client(api_key=api_key)
+    raise ValueError("A variável GEMINI_API_KEY não foi encontrada no ficheiro .env.")
 
 # 3. Transcrição de exemplo de uma reunião de alinhamento de equipa
 TRANSCRICAO_EXEMPLO = """
@@ -48,40 +39,41 @@ Apresenta a tua análise exatamente com esta estrutura:
     - Contexto & Bloqueios: O problema ou situação abordada.
     - Decisão / Conclusão: O que ficou acordado ou resolvido.
 
-3. MAPA DE AÇÕES E ENTREGÁVEIS
-    Lista em tabela ou marcadores:
-    - Tarefa
-    - Responsável
-    - Prazo / Data limite
-    - Nível de Prioridade (Baixa, Média, Alta ou Crítica)
+3. MAPA DE AÇÕES E ENTREGÁVEIS (DISTRIBUIÇÃO DE TAREFAS)
+    É OBRIGATÓRIO apresentar esta secção exclusivamente numa tabela Markdown estruturada, com as seguintes colunas:
+    | Tarefa / Entregável | Responsável | Prazo / Data Limite | Prioridade |
+    |---|---|---|---|
 """
 
-
 def process_meeting_text(transcricao: str) -> str:
+    print("-> A enviar pedido para a API (limite máximo de 15 segundos)...")
     prompt = f"{SYSTEM_INSTRUCTION}\n\n--- INÍCIO DA TRANSCRIÇÃO ---\n{transcricao}\n--- FIM DA TRANSCRIÇÃO ---"
-
-    max_tentativas = 3
-    for tentativa in range(1, max_tentativas + 1):
-        try:
-            # Utiliza a API de interações que confirmámos funcionar no seu sistema
-            interaction = client.interactions.create(
-                model='models/gemini-3.8-flash',
-                input=prompt
-            )
-            return str(interaction.steps[-1])
-        except InternalServerError as e:
-            if tentativa < max_tentativas:
-                print(f"⚠️ Servidor ocupado (503). A tentar novamente em 3 segundos (Tentativa {tentativa}/{max_tentativas})...")
-                time.sleep(3)
-            else:
-                raise e
-
+    
+    # URL direto para o modelo exato que pediste
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    try:
+        # O timeout=15 impede que o terminal fique encravado infinitamente
+        resposta = requests.post(url, json=payload, timeout=15)
+        
+        # Se a resposta for 200 (OK), devolve o texto
+        if resposta.status_code == 200:
+            dados = resposta.json()
+            return dados['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # Se o modelo falhar (ex: nome inválido ou servidor ocupado), mostra o erro cru
+            raise RuntimeError(f"ERRO DA API ({resposta.status_code}): {resposta.text}")
+            
+    except requests.exceptions.Timeout:
+        return "ERRO: O servidor da Google não respondeu ao fim de 15 segundos (Timeout)."
+    except Exception as e:
+        return f"ERRO: {str(e)}"
 
 if __name__ == "__main__":
-    print("A processar a transcrição da reunião com o Gemini 3.8 Flash...\n")
+    print("A processar a transcrição da reunião...\n")
     resultado = process_meeting_text(TRANSCRICAO_EXEMPLO)
 
-    # 5. Impressão do resultado formatado na consola
     print("=" * 65)
     print("        SMARTMEETING · RELATÓRIO EXECUTIVO DA REUNIÃO")
     print("=" * 65)
