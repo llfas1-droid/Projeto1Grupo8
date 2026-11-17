@@ -79,7 +79,7 @@ def process_meeting_text(transcricao: str) -> str:
 
 if __name__ == "__main__":
     print("A processar a transcrição da reunião com o Gemini 3.8 Flash...\n")
-    resultado = extrair_topicos_e_resumo(TRANSCRICAO_EXEMPLO)
+    resultado = process_meeting_text(TRANSCRICAO_EXEMPLO)
 
     # 5. Impressão do resultado formatado na consola
     print("=" * 65)
