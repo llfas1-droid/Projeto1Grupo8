@@ -73,10 +73,9 @@ def process_meeting_media(file_path: str):
            - Decisões concretas tomadas pelo grupo.
 
         3. MAPA DE DISTRIBUIÇÃO DE TAREFAS (AÇÕES):
-           - Tarefa / Entregável
-           - Responsável (se atribuído)
-           - Prazo ou Estimativa (se mencionada)
-           - Nível de Prioridade (Baixa / Média / Alta / Urgente)
+       É OBRIGATÓRIO extrair as ações e apresentá-las numa tabela Markdown com a seguinte estrutura exata:
+       | Tarefa / Entregável | Responsável | Prazo / Estimativa | Nível de Prioridade |
+       |---|---|---|---|
 
         4. TRANSCRIÇÃO DETALHADA COM TIMESTAMPS:
            - Transcreva a conversa com a marcação de tempo (ex: [00:15] Orador: texto).
@@ -84,21 +83,34 @@ def process_meeting_media(file_path: str):
 
         print("[2/3] A enviar para o modelo gemini-3.8-flash...")
 
-        # Chamada ao modelo Gemini 3.8 Flash
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=[uploaded_file, prompt],
-            config=types.GenerateContentConfig(
-                temperature=0.2,  # Baixa temperatura para transcrição mais fidedigna
-            ),
-        )
-
-        # 5. Impressão do resultado na consola
-        print("\n[3/3] ================= RELATÓRIO SMARTMEETING =================")
-        print(response.text)
-        print("=================================================================\n")
-
-        return response.text
+        # Tenta contactar a API até 3 vezes para contornar picos de tráfego
+        max_tentativas = 3
+        for tentativa in range(1, max_tentativas + 1):
+            try:
+                # Chamada ao modelo Gemini 3.8 Flash
+                response = client.models.generate_content(
+                    model="gemini-3.8-flash",
+                    contents=[uploaded_file, prompt],
+                    config=types.GenerateContentConfig(
+                        temperature=0.2, 
+                    ),
+                )
+                
+                # 5. Impressão do resultado na consola
+                print("\n[3/3] ================= RELATÓRIO SMARTMEETING =================")
+                print(response.text)
+                print("=================================================================\n")
+                
+                return response.text
+                
+            except Exception as e:
+                if tentativa < max_tentativas:
+                    print(f"⚠️ Servidor ocupado. A tentar novamente em 3s (Tentativa {tentativa}/{max_tentativas})...")
+                    time.sleep(3)
+                else:
+                    print(f"\n❌ FALHA APÓS 3 TENTATIVAS. O servidor da Google rejeitou o pedido.")
+                    print(f"Detalhe do erro: {str(e)}")
+                    return None
 
     finally:
         # Boas práticas: limpeza do ficheiro na nuvem após o processamento
